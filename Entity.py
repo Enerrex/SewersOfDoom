@@ -24,12 +24,16 @@ class Entity(object):
     def wounds(self) -> WoundManager:
         return self._wounds
 
+    @property
+    def active(self):
+        return self._wounds.active
+
     def _count_damage(self, target):
-        print(f'{self.name} does {self._damage} damage to {target.name}')
+        # print(f'{self.name} does {self._damage} damage to {target.name}')
         self._damage_inflicted[target.name] = self._damage_inflicted.setdefault(target.name, 0) + self._damage
 
     def _count_wounds(self, target):
-        print(f'{self.name} wounds {target.name}')
+        # print(f'{self.name} wounds {target.name}')
         self._wounds_inflicted[target.name] = self._wounds_inflicted.setdefault(target.name, 0) + 1
 
     def attack(self, target):
@@ -38,7 +42,7 @@ class Entity(object):
 
         result = a.get_roll()
         if result == ActionDice.RESULT.FAIL:
-            print(f'{self.name} misses {target.name}')
+            # print(f'{self.name} misses {target.name}')
             return  # Early exit
 
         self._count_damage(target)
@@ -53,14 +57,14 @@ class Entity(object):
 
 import random
 
-if __name__ == '__main__':
-    player = Entity(wounds=4, defense=50, damage=15, name='Smackers')
-    monster1 = Entity(wounds=2, defense=35, damage=7, name='Fred')
-    monster2 = Entity(wounds=2, defense=35, damage=7, name='Bob')
+def run_game():
+    player = Entity(wounds=5, defense=70, damage=20, name='Smackers')
+    monster1 = Entity(wounds=3, defense=35, damage=7, name='Fred')
+    monster2 = Entity(wounds=2, defense=35, damage=15, name='Bob')
 
     entities = [player, monster1, monster2]
     count = 1
-    while player.wounds.active and (monster1.wounds.active or monster2.wounds.active):
+    while player.active and (monster1.active or monster2.active):
         print(f'--- Round {count}---')
         health_bars = [f'{_entity.name}: {_entity.wounds.wound_string}' for _entity in entities]
         print(' '.join(health_bars))
@@ -70,16 +74,41 @@ if __name__ == '__main__':
             player.attack(monster1)
         else:
             player.attack(monster2)
-        monster1.attack(player)
-        monster2.attack(player)
+
+        if monster1.active:
+            monster1.attack(player)
+        if monster2.active:
+            monster2.attack(player)
         count += 1
         print()
 
-    entity_map = {_entity.name: _entity for _entity in entities}
     for _scorer in entities:
         print(f'--- {_scorer.name} report:')
+        dead = _scorer.wounds._out_of_action
+        print(f'{_scorer.name} is {"dead" if _scorer.wounds._out_of_action else "alive"}')
+        if not dead:
+            wm = _scorer.wounds  # Wound manager
+            print(wm.wound_string)
+            wounds_remaining = wm._wounds - wm._wounds_taken
+            print(f'{wounds_remaining} wound{"s" if wounds_remaining > 1 else ""} remaining.')
         for _name, _damage in _scorer._damage_inflicted.items():
             print(f'Did {_damage} damage to {_name}')
         for _name, _wounds in _scorer._wounds_inflicted.items():
             print(f'Wounded {_name} {_wounds} times')
         print()
+
+    if player.wounds._out_of_action:
+        return False
+    return True
+
+if __name__ == '__main__':
+    games_run = 1000
+    results = []
+    for _ in range(games_run):
+        results.append(run_game())
+
+    player_wins = [1 for _result in results if _result]
+    print('-----')
+    print(f'{games_run} games run')
+    print(f'Player won {len(player_wins)} times')
+    print(f'Monsters won {games_run - len(player_wins)} times')
